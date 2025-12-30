@@ -2,18 +2,26 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>管理后台</title>
+    <title>后台管理</title>
+    <style>
+        body { font-family: sans-serif; padding: 20px; background: #f8f9fa; }
+        .container { max-width: 400px; margin: auto; background: white; padding: 25px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.05); }
+        input { width: 100%; padding: 10px; margin: 10px 0; border: 1px solid #ddd; border-radius: 5px; box-sizing: border-box; }
+        button { width: 100%; padding: 12px; background: #07c160; color: white; border: none; border-radius: 5px; cursor: pointer; }
+        .msg { color: #f5222d; font-size: 14px; margin-bottom: 10px; }
+    </style>
 </head>
 <body>
-    <div style="max-width: 300px; margin: 50px auto; text-align: center;">
-        <h3>上传新二维码</h3>
-        {% with messages = get_flashed_messages() %}
-          {% if messages %}<p style="color:red">{{ messages[0] }}</p>{% endif %}
+    <div class="container">
+        <h3>更新码源 (支持多码存放)</h3>
+        {% with msgs = get_flashed_messages() %}
+            {% if msgs %}<p class="msg">{{ msgs[0] }}</p>{% endif %}
         {% endwith %}
         <form method="post" enctype="multipart/form-data">
-            <input type="password" name="password" placeholder="管理密码" required><br><br>
-            <input type="file" name="file" accept="image/*" required><br><br>
-            <button type="submit">更新二维码</button>
+            <input type="password" name="password" placeholder="管理密码" required>
+            <p style="font-size: 13px; color: #666;">上传新码后，旧码将作为备份保留（7天后自动清理）</p>
+            <input type="file" name="file" accept="image/*" required>
+            <button type="submit">确认上传并发布</button>
         </form>
     </div>
 </body>

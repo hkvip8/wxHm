@@ -4,63 +4,68 @@ from flask import Flask, render_template, request, redirect, url_for, flash, sen
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
-app.secret_key = 'some_secret_key'  # 用于 session 和 flash 消息
+app.secret_key = 'multi_qr_secret_key_2025'
 
-# 配置
+# --- 配置 ---
 UPLOAD_FOLDER = 'uploads'
-QR_FILENAME = 'current_group.png'
-ADMIN_PASSWORD = 'admin123'  # 设置你的管理密码
-EXPIRE_DAYS = 7
+ADMIN_PASSWORD = 'admin123'  # 请修改此密码
+EXPIRE_DAYS = 7             # 微信群码有效期
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
-# 确保上传目录存在
 if not os.path.exists(UPLOAD_FOLDER):
     os.makedirs(UPLOAD_FOLDER)
 
-def get_qr_status():
-    """检查二维码是否存在及其是否过期"""
-    path = os.path.join(app.config['UPLOAD_FOLDER'], QR_FILENAME)
-    if not os.path.exists(path):
-        return None, False
+def get_latest_valid_qr():
+    """遍历文件夹，返回最新且有效的图片文件名"""
+    files = [f for f in os.listdir(UPLOAD_FOLDER) if f.lower().endswith(('.png', '.jpg', '.jpeg'))]
+    if not files:
+        return None
     
-    # 获取文件最后修改时间
-    file_time = os.path.getmtime(path)
-    days_passed = (time.time() - file_time) / (24 * 3600)
+    # 按修改时间从新到旧排序
+    files.sort(key=lambda x: os.path.getmtime(os.path.join(UPLOAD_FOLDER, x)), reverse=True)
     
-    if days_passed > EXPIRE_DAYS:
-        # 如果超过7天，自动删除
-        os.remove(path)
-        return None, False
-    
-    return QR_FILENAME, True
+    now = time.time()
+    for filename in files:
+        path = os.path.join(UPLOAD_FOLDER, filename)
+        file_age_days = (now - os.path.getmtime(path)) / (24 * 3600)
+        
+        if file_age_days < EXPIRE_DAYS:
+            return filename
+        else:
+            # 自动清理物理文件
+            try:
+                os.remove(path)
+            except:
+                pass
+    return None
 
-# --- 前端展示页面 ---
 @app.route('/')
 def index():
-    qr_file, is_valid = get_qr_status()
-    return render_template('index.html', qr_file=qr_file, is_valid=is_valid)
+    qr_file = get_latest_valid_qr()
+    timestamp = int(time.time() * 1000)
+    return render_template('index.html', qr_file=qr_file, timestamp=timestamp)
 
-# --- 管理上传页面 ---
 @app.route('/admin', methods=['GET', 'POST'])
 def admin():
     if request.method == 'POST':
-        password = request.form.get('password')
+        pwd = request.form.get('password')
         file = request.files.get('file')
         
-        if password != ADMIN_PASSWORD:
-            flash("密码错误！")
+        if pwd != ADMIN_PASSWORD:
+            flash("验证失败：密码错误")
             return redirect(url_for('admin'))
         
-        if file and file.filename != '':
-            filename = secure_filename(QR_FILENAME)
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            flash("群二维码上传成功！")
+        if file and file.filename:
+            # 使用时间戳命名，确保存储多个不冲突
+            ext = os.path.splitext(file.filename)[1]
+            new_name = f"qr_{int(time.time())}{ext}"
+            file.save(os.path.join(app.config['UPLOAD_FOLDER'], new_name))
+            flash("新群码上传成功！系统已自动切换至此码。")
             return redirect(url_for('index'))
             
     return render_template('admin.html')
 
-# 服务静态文件
 @app.route('/uploads/<filename>')
 def uploaded_file(filename):
     return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
