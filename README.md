@@ -1,5 +1,3 @@
----
-
 # wxHm (WeChat Group Live QR Code Manager)
 
 **wxHm** 是一个轻量级、高性能的微信群活码管理系统。它解决了微信群二维码 7 天有效期限制的痛点，通过固定链接分发，后台动态更新二维码，并集成了 WebP 自动转换与全球 CDN 加速。
@@ -102,5 +100,5 @@ python app.py
 **项目地址**: [https://github.com/cooker/wxHm](https://github.com/cooker/wxHm)
 
 如果你觉得这个项目有帮助，请给一个 **Star ⭐️**！
-
+![](zsm.jpg)
 ---
