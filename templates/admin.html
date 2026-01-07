@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
     <title>后台管理</title>
     <style>
         body { font-family: sans-serif; background: #f8f9fa; padding: 20px; display: flex; flex-direction: column; align-items: center; }
@@ -11,7 +12,7 @@
         button { background: #07c160; color: white; border: none; cursor: pointer; font-weight: bold; }
         .msg { color: #ff4d4f; font-size: 13px; text-align: center; }
         .group-item { background: white; margin-top: 10px; padding: 12px; border-bottom: 1px solid #eee; display: flex; justify-content: space-between; align-items: center; width: 100%; max-width: 400px; font-size: 14px; }
-        .btn-op { background: none; color: #1890ff; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; font-weight: normal; }
+        .btn-op { background: none; color: #1890ff; border: none; cursor: pointer; width: auto; padding: 0 5px; margin: 0; }
         .btn-del { color: #ff4d4f; }
     </style>
 </head>
@@ -23,14 +24,13 @@
         {% endwith %}
         <form method="post" enctype="multipart/form-data" onsubmit="savePwd()">
             <input type="password" id="mainPwd" name="password" placeholder="管理密码" required>
-            <input type="text" name="group_name" placeholder="群组名（如：开发群）" required>
+            <input type="text" name="group_name" placeholder="群组名" required>
             <input type="file" name="file" accept="image/*" required>
             <button type="submit">上传并发布</button>
         </form>
     </div>
 
     <div style="width:100%; max-width:400px; margin-top:20px;">
-        <h4 style="margin-bottom:10px">现有群组：</h4>
         {% for g in groups %}
         <div class="group-item">
             <span><strong>{{ g }}</strong></span>
@@ -43,32 +43,22 @@
         {% endfor %}
     </div>
 
-    <form id="opForm" method="post" style="display:none">
-        <input type="password" name="password" id="opPwd">
-        <input type="hidden" name="old_name" id="oldName">
-        <input type="hidden" name="new_name" id="newName">
-    </form>
+    <form id="opForm" method="post" style="display:none"><input type="password" name="password" id="opPwd"><input type="hidden" name="old_name" id="oldName"><input type="hidden" name="new_name" id="newName"></form>
 
     <script>
         const PWD_KEY = 'wxhm_pwd';
         const EXPIRE_KEY = 'wxhm_expire';
-
         window.onload = () => {
             const pwd = localStorage.getItem(PWD_KEY);
             const exp = localStorage.getItem(EXPIRE_KEY);
-            if (pwd && exp && new Date().getTime() < exp) {
-                document.getElementById('mainPwd').value = pwd;
-            }
+            if (pwd && exp && new Date().getTime() < exp) document.getElementById('mainPwd').value = pwd;
         };
-
         function savePwd() {
-            const pwd = document.getElementById('mainPwd').value;
-            localStorage.setItem(PWD_KEY, pwd);
+            localStorage.setItem(PWD_KEY, document.getElementById('mainPwd').value);
             localStorage.setItem(EXPIRE_KEY, new Date().getTime() + 3*24*60*60*1000);
         }
-
         function handleRename(name) {
-            const n = prompt("输入【"+name+"】的新名字:");
+            const n = prompt("新名字:");
             if(n) {
                 document.getElementById('opPwd').value = document.getElementById('mainPwd').value;
                 document.getElementById('oldName').value = name;
@@ -77,9 +67,8 @@
                 document.getElementById('opForm').submit();
             }
         }
-
         function handleDelete(name) {
-            if(confirm("确定删除【"+name+"】吗？")) {
+            if(confirm("确定删除吗？")) {
                 document.getElementById('opPwd').value = document.getElementById('mainPwd').value;
                 document.getElementById('opForm').action = "/admin/delete/" + name;
                 document.getElementById('opForm').submit();

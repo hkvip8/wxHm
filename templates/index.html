@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer-when-downgrade">
     <title>{{ group_name }} - 进群通道</title>
     <style>
         body { font-family: -apple-system, sans-serif; background: #f0f2f5; display: flex; justify-content: center; padding-top: 50px; }
@@ -25,12 +26,12 @@
         {% if qr_file %}
             <div class="qr-box">
                 <div class="scanner"></div>
-                <img src="{{ wsrv_url }}" class="qr-img">
+                <img src="{{ wsrv_url }}" class="qr-img" onerror="this.src='/uploads/{{ group_name }}/{{ qr_file }}'">
             </div>
             <p class="ok">● 入口已激活</p>
             <p class="hint">长按上方二维码<br>识别并加入群聊</p>
         {% else %}
-            <p style="padding: 50px 0; color: #999;">⚠️ 暂无有效群二维码<br>请联系管理员更新</p>
+            <p style="padding: 50px 0; color: #999;">⚠️ 暂无有效群二维码</p>
         {% endif %}
     </div>
 </body>

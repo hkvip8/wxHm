@@ -1,27 +1,38 @@
 import os
 import time
 import shutil
+import urllib.parse
 from flask import Flask, render_template, request, redirect, url_for, flash, send_from_directory
 from PIL import Image
+from werkzeug.middleware.proxy_fix import ProxyFix
 
 app = Flask(__name__)
 app.secret_key = 'wxHm_secure_key_2026'
 
+# 核心配置：告诉 Flask 它在代理（如 Cloudflare/Nginx）后面
+# 这能确保 request.host_url 正确识别 https
+app.wsgi_app = ProxyFix(app.wsgi_app, x_proto=1, x_host=1)
+
 # --- 配置中心 ---
 UPLOAD_BASE = 'uploads'
-ADMIN_PASSWORD = 'admin123'  # 请在此处修改你的管理密码
+ADMIN_PASSWORD = 'admin123'  # 建议修改
 EXPIRE_DAYS = 7             
 
 if not os.path.exists(UPLOAD_BASE):
     os.makedirs(UPLOAD_BASE)
 
+# 解决跨域与 Referrer Policy 拦截问题
+@app.after_request
+def add_header(response):
+    response.headers['Access-Control-Allow-Origin'] = '*'
+    response.headers['Referrer-Policy'] = 'no-referrer-when-downgrade'
+    return response
+
 def get_active_qr(group_name):
-    """获取最新且有效的图片文件名"""
     group_path = os.path.join(UPLOAD_BASE, group_name)
     if not os.path.exists(group_path): return None
     files = [f for f in os.listdir(group_path) if f.lower().endswith(('.png', '.jpg', '.jpeg', '.webp'))]
     if not files: return None
-    
     files.sort(key=lambda x: os.path.getmtime(os.path.join(group_path, x)), reverse=True)
     
     now = time.time()
@@ -35,23 +46,20 @@ def get_active_qr(group_name):
             except: pass
     return active_file
 
-# --- 路由：用户扫码页 ---
+# --- 路由：展示页 ---
 @app.route('/group/<group_name>')
 def group_page(group_name):
     qr_file = get_active_qr(group_name)
     
-    # 构造公网绝对路径 (wsrv.nl 需要绝对 URL 才能抓取)
-    # request.host_url 会获取如 http://example.com/
-    base_url = request.host_url.rstrip('/') 
-    raw_img_url = f"{base_url}/uploads/{group_name}/{qr_file}"
+    wsrv_url = ""
+    if qr_file:
+        # 强制使用 https 并进行 URL 编码，防止 wsrv 抓取失败
+        host = request.host
+        raw_img_url = f"https://{host}/uploads/{group_name}/{qr_file}"
+        encoded_raw_url = urllib.parse.quote(raw_img_url, safe='')
+        wsrv_url = f"https://wsrv.nl/?url={encoded_raw_url}&we=1&v={int(time.time())}"
     
-    # 拼接 wsrv.nl 处理链接 (&we=1 转WebP, &v=随机数防缓存)
-    wsrv_url = f"https://wsrv.nl/?url={raw_img_url}&we=1&v={int(time.time())}"
-    
-    return render_template('index.html', 
-                           group_name=group_name, 
-                           qr_file=qr_file, 
-                           wsrv_url=wsrv_url)
+    return render_template('index.html', group_name=group_name, qr_file=qr_file, wsrv_url=wsrv_url)
 
 # --- 路由：管理后台 ---
 @app.route('/admin', methods=['GET', 'POST'])
@@ -71,30 +79,26 @@ def admin():
         if group_input and file:
             group_dir = os.path.join(UPLOAD_BASE, group_input)
             if not os.path.exists(group_dir): os.makedirs(group_dir)
-            
             try:
                 img = Image.open(file)
                 if img.mode in ("RGBA", "P"): img = img.convert("RGB")
                 new_filename = f"qr_{int(time.time())}.webp"
                 img.save(os.path.join(group_dir, new_filename), "WEBP", quality=80)
-                flash(f"群组【{group_input}】更新成功 (已优化为WebP)")
+                flash(f"群组【{group_input}】上传成功")
             except Exception as e:
-                flash(f"上传失败: {str(e)}")
+                flash(f"失败: {str(e)}")
             return redirect(url_for('admin'))
             
     return render_template('admin.html', groups=existing_groups)
 
-# --- 路由：更名与删除 ---
 @app.route('/admin/rename', methods=['POST'])
 def rename_group():
     pwd = request.form.get('password')
     old_name = request.form.get('old_name')
     new_name = request.form.get('new_name', '').strip()
     if pwd == ADMIN_PASSWORD and old_name and new_name:
-        old_path, new_path = os.path.join(UPLOAD_BASE, old_name), os.path.join(UPLOAD_BASE, new_name)
-        if not os.path.exists(new_path):
-            os.rename(old_path, new_path)
-            flash("重命名成功")
+        os.rename(os.path.join(UPLOAD_BASE, old_name), os.path.join(UPLOAD_BASE, new_name))
+        flash("更名成功")
     return redirect(url_for('admin'))
 
 @app.route('/admin/delete/<group_name>', methods=['POST'])
@@ -102,7 +106,7 @@ def delete_group(group_name):
     pwd = request.form.get('password')
     if pwd == ADMIN_PASSWORD:
         shutil.rmtree(os.path.join(UPLOAD_BASE, group_name))
-        flash("群组已删除")
+        flash("删除成功")
     return redirect(url_for('admin'))
 
 @app.route('/uploads/<group_name>/<filename>')
